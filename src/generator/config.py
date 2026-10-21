@@ -29,7 +29,7 @@ class ClickHouseSettings(BaseSettings):
 
     host: str = Field(default="localhost")
     port: int = Field(default=8123, ge=1, le=65535)
-    database: str = Field(default="weather")
+    database: str = Field(default="shop")
     user: str = Field(default="default")
     password: str = Field(default="")
 
@@ -58,10 +58,17 @@ class GeneratorSettings(BaseSettings):
         default=3.0, ge=0.0, description="Множитель силы аномалии"
     )
 
-    # --- Справочник станций -------------------------------------------------
+    # --- Справочники интернет-магазина -----------------------------
+
     cities: str = Field(
         default="Vladivostok,Moscow,Kazan,Sochi,Irkutsk",
-        description="Города станций через запятую",
+        description="Города покупателей через запятую",
+    )
+
+    user_count: int = Field(
+        default=100,
+        ge=1,
+        description="Количество пользователей интернет-магазина",
     )
 
     # --- Логирование ---------------------------------------------------------
