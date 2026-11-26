@@ -61,12 +61,16 @@ class GeneratorSettings(BaseSettings):
     # --- Справочники интернет-магазина -----------------------------
 
     cities: str = Field(
-        default="Vladivostok,Moscow,Kazan,Sochi,Irkutsk",
+        default="Vladivostok,Moscow,Kazan,Sochi,Irkutsk,"
+        "Saint Petersburg,Novosibirsk,Yekaterinburg,"
+        "Krasnodar,Rostov-on-Don,Nizhny Novgorod,"
+        "Samara,Ufa,Perm,Chelyabinsk,Omsk,"
+        "Krasnoyarsk,Tyumen,Khabarovsk,Voronezh",
         description="Города покупателей через запятую",
     )
 
     user_count: int = Field(
-        default=100,
+        default=5712,
         ge=1,
         description="Количество пользователей интернет-магазина",
     )
