@@ -10,25 +10,107 @@ from generator.models import Order, Product, User
 from .anomalies import AnomalyKind, AnomalyPolicy
 from .metrics import OrderContext, QuantitySampler
 
+_CATEGORY_WEIGHTS = {
+    "Одежда": 15,
+    "Красота и уход": 15,
+    "Дом и сад": 12,
+    "Обувь": 10,
+    "Электроника": 8,
+    "Детские товары": 8,
+    "Зоотовары": 6,
+    "Аксессуары": 6,
+    "Бытовая техника": 6,
+    "Книги и канцелярия": 5,
+    "Спорт": 5,
+    "Автотовары": 4,
+}
+
+_PRODUCT_DEMAND = {
+    # Товары регулярного потребления
+    "Шампунь": 10,
+    "Гель для душа": 10,
+    "Зубная паста": 10,
+    "Подгузники": 10,
+    "Влажные салфетки детские": 9,
+    "Дезодорант": 8,
+    "Мыло жидкое": 8,
+    "Сухой корм для кошек 2 кг": 10,
+    "Сухой корм для собак 3 кг": 10,
+    "Влажный корм для кошек": 10,
+    "Влажный корм для собак": 10,
+    "Наполнитель для лотка": 9,
+
+    # Популярные повседневные товары
+    "Футболка": 8,
+    "Носки": 10,
+    "Джинсы": 6,
+    "Худи": 6,
+    "Кроссовки": 7,
+    "Кеды": 6,
+    "Наушники": 6,
+    "Беспроводные наушники": 6,
+    "Кабель USB-C": 8,
+    "Зарядное устройство USB-C": 7,
+    "Смартфон": 4,
+    "Бюджетный смартфон": 5,
+    "Крем для рук": 7,
+    "Полотенце": 6,
+    "Шариковая ручка": 7,
+    "Бумага A4": 7,
+
+    # Товары длительного использования
+    "Ноутбук": 2,
+    "Игровой ноутбук": 1,
+    "Миксер": 1,
+    "Холодильник": 1,
+    "Стиральная машина": 1,
+    "Посудомоечная машина": 1,
+    "Кофемашина": 1,
+    "Пылесос": 2,
+    "Боксёрские перчатки": 1,
+    "Беговая дорожка": 1,
+    "Велотренажёр": 1,
+    "Горный велосипед": 1,
+    "Аквариум 40 л": 1,
+    "Детская коляска": 1,
+    "Письменный стол": 1,
+    "Офисное кресло": 2,
+}
+
 def _build_product_weights(
     products: list[Product],
     rng: random.Random,
-) -> list[int]:
-    """Рассчитать веса товаров с учётом цены и популярности."""
+) -> list[float]:
+    """Рассчитать веса товаров с учётом спроса и цены."""
 
-    popularity = rng.choices(
-        [1, 3, 6],
-        weights=[60, 30, 10],
-        k=len(products),
-    )
+    weights = []
+    category_totals = {}
 
-    return [
-        popularity_weight * (
+    for product in products:
+        demand = _PRODUCT_DEMAND.get(product.name, 3)
+
+        price_factor = (
             3 if product.price < Decimal("5000")
             else 2 if product.price < Decimal("20000")
             else 1
         )
-        for product, popularity_weight in zip(products, popularity)
+
+        variation = rng.uniform(0.85, 1.15)
+
+        weight = demand * price_factor * variation
+
+        weights.append(weight)
+
+        category_totals[product.category] = (
+            category_totals.get(product.category, 0)
+            + weight
+        )
+
+    return [
+        weight
+        / category_totals[product.category]
+        * _CATEGORY_WEIGHTS.get(product.category, 1)
+        for product, weight in zip(products, weights)
     ]
 
 class OrderGenerator:
@@ -40,7 +122,7 @@ class OrderGenerator:
         products: list[Product],
         anomaly_policy: AnomalyPolicy,
         rng: random.Random,
-        product_weights: list[int] | None = None,
+        product_weights: list[float] | None = None,
     ) -> None:
         if not products:
             raise ValueError("Каталог товаров пуст")
