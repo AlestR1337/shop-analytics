@@ -352,6 +352,28 @@ class ProductCatalog:
             in enumerate(_PRODUCTS, start=1)
         ]
 
+_CITY_WEIGHTS = {
+    "Moscow": 100,
+    "Saint Petersburg": 55,
+    "Novosibirsk": 25,
+    "Yekaterinburg": 23,
+    "Kazan": 20,
+    "Nizhny Novgorod": 19,
+    "Krasnodar": 18,
+    "Chelyabinsk": 17,
+    "Samara": 16,
+    "Ufa": 16,
+    "Rostov-on-Don": 15,
+    "Krasnoyarsk": 14,
+    "Omsk": 13,
+    "Voronezh": 12,
+    "Perm": 12,
+    "Tyumen": 10,
+    "Irkutsk": 8,
+    "Vladivostok": 8,
+    "Khabarovsk": 7,
+    "Sochi": 6,
+}
 
 class UserCatalog:
     """Генератор справочника пользователей."""
@@ -377,10 +399,19 @@ class UserCatalog:
     def users(self) -> list[User]:
         rng = random.Random(self._seed)
 
+        city_weights = [
+            _CITY_WEIGHTS.get(city, 5)
+            for city in self._cities
+        ]
+
         return [
             User(
                 user_id=index,
-                city=rng.choice(self._cities),
+                city=rng.choices(
+                    self._cities,
+                    weights=city_weights,
+                    k=1,
+                )[0],
                 registered_at=(
                     self._as_of
                     - timedelta(days=rng.randint(1, 730))
