@@ -1,14 +1,15 @@
-
 from __future__ import annotations
 
 import math
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from generator.models import Order, Product, User
 from .anomalies import AnomalyKind, AnomalyPolicy
 from .metrics import OrderContext, QuantitySampler
+from .seasonality import demand_factor
+
 
 _CATEGORY_WEIGHTS = {
     "Одежда": 15,
@@ -24,6 +25,7 @@ _CATEGORY_WEIGHTS = {
     "Спорт": 5,
     "Автотовары": 4,
 }
+
 
 _PRODUCT_DEMAND = {
     # Товары регулярного потребления
@@ -77,6 +79,7 @@ _PRODUCT_DEMAND = {
     "Офисное кресло": 2,
 }
 
+
 def _build_product_weights(
     products: list[Product],
     rng: random.Random,
@@ -112,6 +115,7 @@ def _build_product_weights(
         * _CATEGORY_WEIGHTS.get(product.category, 1)
         for product, weight in zip(products, weights)
     ]
+
 
 class OrderGenerator:
     """Генерация заказов одного пользователя."""
@@ -233,7 +237,12 @@ class OrderGenerator:
 
 
 class BatchGenerator:
-    """Генерация пачки заказов."""
+    """Производит пачку заказов покупателей за окно времени.
+
+    Каждая запись последовательности получает свой момент времени.
+    Шаг между заказами зависит от суточной и недельной активности покупателей.
+    Заказы распределяются между пользователями с учётом их активности.
+    """
 
     def __init__(
         self,
@@ -245,6 +254,10 @@ class BatchGenerator:
         if not users:
             raise ValueError("Список пользователей пуст")
 
+        if not products:
+            raise ValueError("Каталог товаров пуст")
+
+        self._products = products
         self._rng = random.Random(seed)
         profile_rng = random.Random(seed + 1)
 
@@ -276,6 +289,17 @@ class BatchGenerator:
     def users(self) -> list[User]:
         return [g.user for g in self._per_user]
 
+    @property
+    def products(self) -> list[Product]:
+        return list(self._products)
+
+    def set_next_order_id(self, order_id: int) -> None:
+        """Установить идентификатор следующего заказа."""
+        if order_id < 1:
+            raise ValueError("Идентификатор заказа должен быть положительным")
+
+        self._next_order_id = order_id
+
     def generate_batch(
         self,
         at: datetime,
@@ -290,10 +314,10 @@ class BatchGenerator:
 
         for _ in range(size):
             generator = self._rng.choices(
-            self._per_user,
-            weights=self._user_weights,
-            k=1,
-        )[0]
+                self._per_user,
+                weights=self._user_weights,
+                k=1,
+            )[0]
 
             order = generator.generate(
                 at,
@@ -303,5 +327,49 @@ class BatchGenerator:
             orders.append(order)
 
             self._next_order_id += 1
+
+        return orders
+
+    def next_timestamp(
+        self,
+        at: datetime,
+        step_seconds: float,
+    ) -> datetime:
+        """Следующий момент генерации с учётом сезонности."""
+        if step_seconds <= 0:
+            raise ValueError("Шаг генерации должен быть положительным")
+
+        step = max(0.1, step_seconds / demand_factor(at))
+
+        return at + timedelta(seconds=step)
+
+    def generate_sequence(
+        self,
+        start: datetime,
+        count: int,
+        step_seconds: float,
+        end: datetime | None = None,
+    ) -> list[Order]:
+        """Прямая последовательность заказов, начиная с `start`.
+
+        Используется бэкфиллом и realtime-фазой: каждая запись получает свой,
+        возрастающий таймстемп с учётом сезонности.
+        Если задан `end`, генерация не выходит за пределы этого времени.
+        """
+        if count < 0:
+            raise ValueError("Количество заказов не может быть отрицательным")
+
+        if step_seconds <= 0:
+            raise ValueError("Шаг генерации должен быть положительным")
+
+        orders: list[Order] = []
+        ts = start
+
+        for _ in range(count):
+            if end is not None and ts > end:
+                break
+
+            orders.extend(self.generate_batch(ts, 1))
+            ts = self.next_timestamp(ts, step_seconds)
 
         return orders
