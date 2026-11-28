@@ -1,4 +1,3 @@
-
 """Интерфейс хранилища данных интернет-магазина."""
 
 from __future__ import annotations
@@ -30,4 +29,8 @@ class Repository(Protocol):
 
     def max_timestamp(self) -> datetime | None:
         """Получить время последнего заказа."""
+        ...
+
+    def max_order_id(self) -> int | None:
+        """Получить максимальный идентификатор заказа."""
         ...

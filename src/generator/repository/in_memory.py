@@ -39,3 +39,6 @@ class InMemoryRepository:
 
     def max_timestamp(self) -> datetime | None:
         return max((o.timestamp for o in self.orders), default=None)
+
+    def max_order_id(self) -> int | None:
+        return max((o.order_id for o in self.orders), default=None)
